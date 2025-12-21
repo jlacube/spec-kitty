@@ -52,13 +52,37 @@ def copy_specify_base_from_local(repo_root: Path, project_path: Path, script_typ
     specify_root = project_path / ".kittify"
     specify_root.mkdir(parents=True, exist_ok=True)
 
-    # Copy from .kittify/memory/ for consistency with other .kittify paths
+    # Copy memory directory (constitution template)
+    # In worktrees, .kittify/memory may be a Git symlink (stored as text file on Windows)
+    # We need to resolve it and copy from the actual location
     memory_src = repo_root / ".kittify" / "memory"
-    if memory_src.exists() and memory_src.is_dir():
-        memory_dest = specify_root / "memory"
-        if memory_dest.exists():
-            shutil.rmtree(memory_dest)
-        shutil.copytree(memory_src, memory_dest)
+    memory_dest = specify_root / "memory"
+    
+    if memory_src.exists():
+        actual_src = memory_src
+        
+        # On Windows, Git symlinks are stored as text files containing relative paths
+        # Check if it's a file (potential symlink) and resolve it
+        if memory_src.is_file() and not memory_src.is_dir():
+            try:
+                # Read symlink target and resolve to actual directory
+                symlink_target = memory_src.read_text(encoding='utf-8').strip()
+                if symlink_target and not symlink_target.startswith('#'):
+                    # Resolve relative path from .kittify directory
+                    actual_src = (memory_src.parent / symlink_target).resolve()
+            except (OSError, UnicodeDecodeError):
+                # If reading fails, try fallback to root memory/
+                actual_src = repo_root / "memory"
+        
+        # If resolved path doesn't exist or isn't a directory, try root memory/ as fallback
+        if not actual_src.exists() or not actual_src.is_dir():
+            actual_src = repo_root / "memory"
+        
+        # Copy from actual source if it's a valid directory
+        if actual_src.exists() and actual_src.is_dir():
+            if memory_dest.exists():
+                shutil.rmtree(memory_dest)
+            shutil.copytree(actual_src, memory_dest)
 
     # Copy scripts with fallback logic
     # Try .kittify/scripts/ first (has bash scripts in worktree)
