@@ -156,10 +156,12 @@ def _get_artifact_info(path: Path) -> Dict[str, any]:
     }
 
 
-def get_feature_artifacts(feature_dir: Path) -> Dict[str, Dict[str, any]]:
+def get_feature_artifacts(feature_dir: Path, project_dir: Path = None) -> Dict[str, Dict[str, any]]:
     """Return which artifacts exist for a feature with modification info."""
+    # Constitution lives at project level, not feature level
+    constitution_path = (project_dir / ".kittify" / "memory" / "constitution.md") if project_dir else (feature_dir / "constitution.md")
     return {
-        "constitution": _get_artifact_info(feature_dir / "constitution.md"),
+        "constitution": _get_artifact_info(constitution_path),
         "spec": _get_artifact_info(feature_dir / "spec.md"),
         "plan": _get_artifact_info(feature_dir / "plan.md"),
         "tasks": _get_artifact_info(feature_dir / "tasks.md"),
@@ -274,7 +276,7 @@ def scan_all_features(project_dir: Path) -> List[Dict[str, Any]]:
             except json.JSONDecodeError:
                 meta_data = None
 
-        artifacts = get_feature_artifacts(feature_dir)
+        artifacts = get_feature_artifacts(feature_dir, project_dir)
         workflow = get_workflow_status(artifacts)
 
         kanban_stats = {"total": 0, "planned": 0, "doing": 0, "for_review": 0, "done": 0}

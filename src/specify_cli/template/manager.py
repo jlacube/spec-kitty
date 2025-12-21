@@ -54,22 +54,28 @@ def copy_specify_base_from_local(repo_root: Path, project_path: Path, script_typ
 
     # Copy from .kittify/memory/ for consistency with other .kittify paths
     memory_src = repo_root / ".kittify" / "memory"
-    if memory_src.exists():
+    if memory_src.exists() and memory_src.is_dir():
         memory_dest = specify_root / "memory"
         if memory_dest.exists():
             shutil.rmtree(memory_dest)
         shutil.copytree(memory_src, memory_dest)
 
-    # Copy from .kittify/scripts/ (not root /scripts/)
-    # The .kittify/scripts/ directory has the full implementation including
-    # worktree symlink code for shared constitution
+    # Copy scripts with fallback logic
+    # Try .kittify/scripts/ first (has bash scripts in worktree)
+    # Fall back to root /scripts/ (has powershell scripts)
+    scripts_dest = specify_root / "scripts"
+    if scripts_dest.exists():
+        shutil.rmtree(scripts_dest)
+    scripts_dest.mkdir(parents=True, exist_ok=True)
+
+    variant = "bash" if script_type == "sh" else "powershell"
+
+    # Try .kittify/scripts first (worktree location), fall back to root /scripts/
     scripts_src = repo_root / ".kittify" / "scripts"
+    if not scripts_src.exists() or not (scripts_src / variant).exists():
+        scripts_src = repo_root / "scripts"
+
     if scripts_src.exists():
-        scripts_dest = specify_root / "scripts"
-        if scripts_dest.exists():
-            shutil.rmtree(scripts_dest)
-        scripts_dest.mkdir(parents=True, exist_ok=True)
-        variant = "bash" if script_type == "sh" else "powershell"
         variant_src = scripts_src / variant
         if variant_src.exists():
             shutil.copytree(variant_src, scripts_dest / variant)
@@ -134,7 +140,7 @@ def copy_specify_base_from_package(project_path: Path, script_type: str) -> Path
     specify_root.mkdir(parents=True, exist_ok=True)
 
     memory_resource = data_root.joinpath("memory")
-    if memory_resource.exists():
+    if memory_resource.exists() and memory_resource.is_dir():
         copy_package_tree(memory_resource, specify_root / "memory")
 
     scripts_resource = data_root.joinpath("scripts")
